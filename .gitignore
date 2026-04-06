@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+myenv/
+
+# Environment / secrets
+.env
+.env.*
+
+# Sentence-transformers / HuggingFace cache
+.cache/
+
+# FAISS
+*.index
+
+# OS
+.DS_Store
+Thumbs.db
