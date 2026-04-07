@@ -7,15 +7,12 @@ import { getCurrentUser, logoutUser } from "@/lib/api";
 
 const API_BASE = "http://127.0.0.1:8000";
 
-const CATEGORIES = [
-  "Income",
-  "Groceries",
-  "Coffee",
-  "Rent",
-  "Transport",
-  "Entertainment",
-  "Other",
-];
+interface Category {
+  id: number;
+  user_id: string;
+  name: string;
+  color: string;
+}
 
 interface Transaction {
   id: number;
@@ -38,7 +35,7 @@ function fmt(amount: number) {
 const EMPTY_FORM = {
   date: "",
   amount: "",
-  category: "Groceries",
+  category: "",
   description: "",
 };
 
@@ -49,6 +46,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -56,6 +54,7 @@ export default function TransactionsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const firstFieldRef = useRef<HTMLInputElement>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   async function fetchTransactions(uid: number) {
     setLoading(true);
@@ -80,6 +79,13 @@ export default function TransactionsPage() {
     setEmail(user.email);
     setUserId(user.user_id);
     fetchTransactions(user.user_id);
+    fetch(`${API_BASE}/categories/${user.user_id}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: Category[]) => {
+        setCategories(data);
+        setForm((f) => ({ ...f, category: f.category || (data[0]?.name ?? "") }));
+      })
+      .catch(() => {});
   }, [router]);
 
   // Focus first field when modal opens
@@ -91,7 +97,7 @@ export default function TransactionsPage() {
 
   function openModal() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, category: categories[0]?.name ?? "" });
     setFormError("");
     setModalOpen(true);
   }
@@ -157,6 +163,24 @@ export default function TransactionsPage() {
     }
   }
 
+  async function handleDelete(t: Transaction) {
+    if (!userId) return;
+    if (!window.confirm(`Are you sure you want to delete this transaction?\n\n${t.date} · ${t.category} · ${t.description} · $${t.amount}`)) return;
+    setDeletingId(t.id);
+    try {
+      const res = await fetch(`${API_BASE}/transactions/${t.id}?user_id=${userId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.detail ?? "Failed to delete transaction.");
+      }
+      await fetchTransactions(userId);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   function handleLogout() {
     logoutUser();
     router.push("/login");
@@ -175,12 +199,20 @@ export default function TransactionsPage() {
           <span className="hidden sm:block text-gray-300">|</span>
           <span className="hidden sm:block text-sm text-gray-500">{email}</span>
         </div>
-        <button
-          onClick={handleLogout}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition"
-        >
-          Log out
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/categories"
+            className="hidden sm:block text-sm font-medium text-gray-500 hover:text-indigo-600 transition"
+          >
+            Categories
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition"
+          >
+            Log out
+          </button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -295,9 +327,16 @@ export default function TransactionsPage() {
                       <td className="px-6 py-4 text-right">
                         <button
                           onClick={() => openEdit(t)}
-                          className="text-xs font-medium text-indigo-600 hover:text-indigo-500 transition"
+                          className="text-xs font-medium text-indigo-600 hover:text-indigo-500 transition mr-3"
                         >
                           Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(t)}
+                          disabled={deletingId === t.id}
+                          className="text-xs font-medium text-red-600 hover:text-red-500 transition disabled:opacity-50"
+                        >
+                          {deletingId === t.id ? "Deleting…" : "Delete"}
                         </button>
                       </td>
                     </tr>
@@ -366,12 +405,22 @@ export default function TransactionsPage() {
                   onChange={(e) => field("category", e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition bg-white"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.name}
                     </option>
                   ))}
                 </select>
+                {/* Color dot preview */}
+                {form.category && (() => {
+                  const cat = categories.find((c) => c.name === form.category);
+                  return cat ? (
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                      <span className="text-xs text-gray-400">{cat.name}</span>
+                    </div>
+                  ) : null;
+                })()}
               </div>
 
               {/* Amount */}

@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 from groq import Groq
 
+from database import get_db, get_transactions
 from embeddings import search_similar
 
 load_dotenv()
@@ -32,14 +33,39 @@ def retrieve(query: str, user_id: str) -> list[str]:
     return search_similar(query, user_id)
 
 
-def generate(query: str, context: list[str]) -> str:
-    """Send query + context to Groq and return the assistant's answer."""
-    if context:
-        numbered = "\n".join(f"{i + 1}. {item}" for i, item in enumerate(context))
-        context_block = f"Here are the relevant transactions:\n{numbered}"
-    else:
-        context_block = "No relevant transactions were found."
+def _fmt_row(t: object) -> str:
+    """Format a SQLAlchemy Transaction row as a readable string."""
+    return f"{t.date} - {t.category} - {t.description} - ${t.amount}"  # type: ignore[attr-defined]
 
+
+def generate(
+    query: str,
+    all_tx: list,
+    relevant: list[str],
+) -> str:
+    """Send full transaction history + semantically relevant subset to Groq."""
+    total_count = len(all_tx)
+
+    # Section 1 — header
+    header = f"The user has {total_count} transactions in total."
+
+    # Section 2 — complete history
+    if all_tx:
+        history_lines = "\n".join(
+            f"{i + 1}. {_fmt_row(t)}" for i, t in enumerate(all_tx)
+        )
+        history_block = f"Complete transaction history:\n{history_lines}"
+    else:
+        history_block = "Complete transaction history:\n(no transactions found)"
+
+    # Section 3 — FAISS top results
+    if relevant:
+        relevant_lines = "\n".join(f"{i + 1}. {r}" for i, r in enumerate(relevant))
+        relevant_block = f"Most relevant to your question:\n{relevant_lines}"
+    else:
+        relevant_block = "Most relevant to your question:\n(none found)"
+
+    context_block = f"{header}\n\n{history_block}\n\n{relevant_block}"
     user_message = f"{context_block}\n\nQuestion: {query}"
 
     response = client.chat.completions.create(
@@ -54,8 +80,17 @@ def generate(query: str, context: list[str]) -> str:
 
 def run_pipeline(query: str, user_id: str) -> dict:
     """Run the full RAG pipeline and return answer + relevant transactions."""
+    # Semantic retrieval (FAISS top-k)
     relevant_transactions = retrieve(query, user_id)
-    answer = generate(query, relevant_transactions)
+
+    # Full history from MySQL for complete context
+    db = next(get_db())
+    try:
+        all_transactions = get_transactions(db, user_id)
+    finally:
+        db.close()
+
+    answer = generate(query, all_transactions, relevant_transactions)
     return {
         "answer": answer,
         "relevant_transactions": relevant_transactions,
