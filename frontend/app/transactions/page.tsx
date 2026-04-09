@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getCurrentUser, logoutUser } from "@/lib/api";
+import UploadStatement from "@/components/UploadStatement";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -55,6 +56,7 @@ export default function TransactionsPage() {
   const [formError, setFormError] = useState("");
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
 
   async function fetchTransactions(uid: number) {
     setLoading(true);
@@ -232,12 +234,20 @@ export default function TransactionsPage() {
               All your recorded transactions
             </p>
           </div>
-          <button
-            onClick={openModal}
-            className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
-          >
-            + Add Transaction
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setUploadModalOpen(true)}
+              className="rounded-lg border border-indigo-300 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
+            >
+              ↑ Upload Statement
+            </button>
+            <button
+              onClick={openModal}
+              className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
+            >
+              + Add Transaction
+            </button>
+          </div>
         </div>
 
         {/* Error banner */}
@@ -347,6 +357,36 @@ export default function TransactionsPage() {
           )}
         </div>
       </main>
+
+      {/* Upload Statement Modal */}
+      {uploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setUploadModalOpen(false)}
+          />
+          <div className="relative w-full max-w-lg mx-4 bg-white rounded-2xl shadow-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Upload Bank Statement</h2>
+                <p className="text-xs text-gray-400 mt-0.5">CSV with date, description, amount columns</p>
+              </div>
+              <button
+                onClick={() => setUploadModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <UploadStatement
+              onSuccess={() => {
+                if (userId) fetchTransactions(userId);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Add Transaction Modal */}
       {modalOpen && (

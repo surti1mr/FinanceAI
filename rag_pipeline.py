@@ -78,6 +78,34 @@ def generate(
     return response.choices[0].message.content
 
 
+def auto_categorize(description: str, categories: list[str]) -> str:
+    """Use Groq to assign the best category to a transaction description."""
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are a financial transaction categorizer. "
+                    "Given a transaction description, return ONLY the most appropriate "
+                    "category name from the provided list. Return nothing else — just the category name."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Transaction: {description}\n"
+                    f"Categories: {', '.join(categories)}\n"
+                    "Return only the category name."
+                ),
+            },
+        ],
+        temperature=0,
+    )
+    result = response.choices[0].message.content.strip()
+    return result if result in categories else "Other"
+
+
 def run_pipeline(query: str, user_id: str) -> dict:
     """Run the full RAG pipeline and return answer + relevant transactions."""
     # Semantic retrieval (FAISS top-k)

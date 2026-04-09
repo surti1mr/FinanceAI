@@ -1,8 +1,10 @@
 """FinanceIQ — personal finance API."""
 
+import csv
+import io
 from typing import List
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -25,7 +27,7 @@ from database import (
     verify_password,
 )
 from embeddings import add_transactions_to_index, reload_user_transactions
-from rag_pipeline import run_pipeline
+from rag_pipeline import auto_categorize, run_pipeline
 
 Base.metadata.create_all(bind=engine)
 
@@ -129,6 +131,81 @@ async def upload_transactions(
     save_transactions(db, body.transactions)
     add_transactions_to_index(body.transactions)
     return {"success": True, "count": len(body.transactions)}
+
+
+@app.post("/upload-statement")
+async def upload_statement(
+    request: Request,
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    print(f"{request.method} {request.url.path}")
+
+    # Read and decode the uploaded CSV bytes
+    raw = await file.read()
+    text = raw.decode("utf-8-sig")  # strip BOM if present
+
+    # Auto-detect delimiter (comma or semicolon)
+    dialect = csv.Sniffer().sniff(text[:2048], delimiters=",;")
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+
+    # Normalise header names (strip whitespace + lowercase)
+    rows = []
+    for row in reader:
+        normalised = {k.strip().lower(): v.strip() for k, v in row.items()}
+        rows.append(normalised)
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no data rows.")
+
+    # Validate required columns
+    required = {"date", "description", "amount"}
+    missing = required - set(rows[0].keys())
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"CSV is missing required columns: {', '.join(missing)}. "
+                   f"Found columns: {', '.join(rows[0].keys())}",
+        )
+
+    # Fetch this user's category names for auto-categorization
+    from database import get_categories, seed_default_categories  # noqa: PLC0415
+    cats = get_categories(db, user_id)
+    if not cats:
+        seed_default_categories(db, user_id)
+        cats = get_categories(db, user_id)
+    category_names = [c.name for c in cats]
+
+    # Parse rows and auto-categorize
+    transactions = []
+    for row in rows:
+        try:
+            amount = float(row["amount"].replace("$", "").replace(",", ""))
+        except ValueError:
+            continue  # skip rows with unparseable amounts
+
+        category = auto_categorize(row["description"], category_names)
+        transactions.append({
+            "date": row["date"],
+            "amount": abs(amount),
+            "category": category,
+            "description": row["description"],
+            "user_id": user_id,
+        })
+
+    if not transactions:
+        raise HTTPException(status_code=400, detail="No valid transactions found in CSV.")
+
+    # Persist to MySQL and index in FAISS
+    save_transactions(db, transactions)
+    add_transactions_to_index(transactions)
+
+    return {
+        "success": True,
+        "count": len(transactions),
+        "transactions": transactions,
+    }
 
 
 @app.post("/ask")
