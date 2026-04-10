@@ -386,7 +386,7 @@ export default function DashboardPage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(v: number) => fmt(v)}
+                      formatter={(v) => fmt(Number(v))}
                       contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
                     />
                     <Legend
@@ -423,7 +423,7 @@ export default function DashboardPage() {
                     width={52}
                   />
                   <Tooltip
-                    formatter={(v: number) => fmt(v)}
+                    formatter={(v) => fmt(Number(v))}
                     contentStyle={{ borderRadius: "8px", fontSize: "12px" }}
                   />
                   <Legend
