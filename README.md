@@ -22,7 +22,7 @@ Add screenshots here
 ## Tech Stack
 ### Backend
 - FastAPI (Python)
-- MySQL with SQLAlchemy ORM
+- PostgreSQL with SQLAlchemy ORM
 - FAISS vector database (in-memory semantic search)
 - Sentence Transformers (all-MiniLM-L6-v2)
 - Groq API with LLaMA 3.3 70B
@@ -38,7 +38,7 @@ Add screenshots here
 ### Prerequisites
 - Python 3.10+
 - Node.js 18+
-- MySQL
+- PostgreSQL
 - Groq API key (free at groq.com)
 
 ### Backend Setup
@@ -51,17 +51,13 @@ pip install -r requirements.txt
 
 Create a `.env` file in `/Fin`:
 ```
-DATABASE_URL=mysql+pymysql://root:yourpassword@localhost:3306/financeai
+DATABASE_URL=postgresql+psycopg2://user:password@host:port/dbname?sslmode=require
 GROQ_API_KEY=your_groq_api_key
 ```
 
 Set up the database:
 ```bash
-# Option 1 — run the schema file in MySQL Workbench
-# Open schema.sql and run it
-
-# Option 2 — let SQLAlchemy create tables automatically
-# Just start the server and tables are created on first run
+# Just start the server — SQLAlchemy creates tables automatically on first run
 ```
 
 Start the backend:

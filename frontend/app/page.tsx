@@ -15,7 +15,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import DashboardWalkthrough from "@/components/DashboardWalkthrough";
 import { getCurrentUser, logoutUser } from "@/lib/api";
+import { startDashboardTour } from "@/lib/walkthrough";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -49,6 +51,23 @@ function fmt(amount: number) {
     currency: "USD",
     minimumFractionDigits: 2,
   }).format(Math.abs(amount));
+}
+
+function toISODateString(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const dmy = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
 }
 
 function SummaryCard({
@@ -145,7 +164,12 @@ export default function DashboardPage() {
 
   function openEdit(t: Transaction) {
     setEditingId(t.id);
-    setForm({ date: t.date, amount: String(t.amount), category: t.category, description: t.description });
+    setForm({
+      date: toISODateString(t.date),
+      amount: String(t.amount),
+      category: t.category,
+      description: t.description,
+    });
     setFormError("");
     setModalOpen(true);
   }
@@ -271,14 +295,16 @@ export default function DashboardPage() {
       });
     }
     transactions.forEach((t) => {
-      const [year, mon] = t.date.split("-").map(Number);
+      const isoDate = toISODateString(t.date);
+      if (!isoDate) return;
+      const [year, mon] = isoDate.split("-").map(Number);
       const label = new Date(year, mon - 1, 1).toLocaleString("en-US", {
         month: "short",
         year: "2-digit",
       });
       const slot = months.find((m) => m.month === label);
       if (!slot) return;
-      if (t.category === "Income") slot.Income += t.amount;
+      if (t.category.trim().toLowerCase() === "income") slot.Income += t.amount;
       else slot.Expenses += t.amount;
     });
     return months.map((m) => ({
@@ -291,22 +317,44 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top nav */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-indigo-600">FinanceAI</span>
+      <header
+        data-tour="app-header"
+        className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Link href="/" className="shrink-0 text-lg font-bold text-indigo-600">
+            FinanceAI
+          </Link>
           <span className="hidden sm:block text-gray-300">|</span>
-          <span className="hidden sm:block text-sm text-gray-500">{email}</span>
+          <span className="hidden sm:inline truncate text-sm text-gray-500 max-w-[10rem] sm:max-w-none">
+            {email}
+          </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <Link
+            href="/transactions"
+            className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition whitespace-nowrap"
+          >
+            Transactions
+          </Link>
           <Link
             href="/categories"
-            className="hidden sm:block text-sm font-medium text-gray-500 hover:text-indigo-600 transition"
+            data-tour="nav-categories"
+            className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition whitespace-nowrap"
           >
             Categories
           </Link>
           <button
+            type="button"
+            onClick={() => startDashboardTour({ persistComplete: true })}
+            className="rounded-lg px-2.5 py-2 text-xs sm:text-sm font-medium text-purple-700 hover:bg-purple-50 transition whitespace-nowrap"
+            title="Replay product tour"
+          >
+            Tour
+          </button>
+          <button
             onClick={handleLogout}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition"
+            className="rounded-lg border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition whitespace-nowrap"
           >
             Log out
           </button>
@@ -322,6 +370,8 @@ export default function DashboardPage() {
             </p>
           </div>
           <button
+            type="button"
+            data-tour="dash-add-transaction"
             onClick={openModal}
             className="rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition"
           >
@@ -347,7 +397,10 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div
+            data-tour="dash-summary"
+            className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+          >
             <SummaryCard label="Total Income" value={income} color="green" />
             <SummaryCard label="Total Expenses" value={expenses} color="red" />
             <SummaryCard label="Net Balance" value={net} color="indigo" />
@@ -450,7 +503,10 @@ export default function DashboardPage() {
         )}
 
         {/* Recent transactions */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div
+          data-tour="dash-recent"
+          className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+        >
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">Recent Transactions</h2>
             <div className="flex items-center gap-3">
@@ -678,6 +734,7 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+      <DashboardWalkthrough bootReady={!loading && userId !== null} />
     </div>
   );
 }

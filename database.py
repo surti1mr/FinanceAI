@@ -1,4 +1,4 @@
-"""FinanceIQ — SQLAlchemy + MySQL (PyMySQL) database layer."""
+"""FinanceIQ — SQLAlchemy + PostgreSQL (psycopg2) database layer."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError(
         "DATABASE_URL is not set. Add it to a .env file, e.g. "
-        "DATABASE_URL=mysql+pymysql://root:root@127.0.0.1:3306/financeiq"
+        "DATABASE_URL=postgresql+psycopg2://user:password@host:port/defaultdb?sslmode=require"
     )
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)

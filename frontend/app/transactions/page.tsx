@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import TransactionsWalkthrough from "@/components/TransactionsWalkthrough";
 import { getCurrentUser, logoutUser } from "@/lib/api";
 import UploadStatement from "@/components/UploadStatement";
+import { startTransactionsTour } from "@/lib/walkthrough";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -31,6 +33,23 @@ function fmt(amount: number) {
     currency: "USD",
     minimumFractionDigits: 2,
   }).format(Math.abs(amount));
+}
+
+function toISODateString(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const dmy = value.match(/^(\d{2})[-/](\d{2})[-/](\d{4})$/);
+  if (dmy) {
+    const [, dd, mm, yyyy] = dmy;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
 }
 
 const EMPTY_FORM = {
@@ -106,7 +125,12 @@ export default function TransactionsPage() {
 
   function openEdit(t: Transaction) {
     setEditingId(t.id);
-    setForm({ date: t.date, amount: String(t.amount), category: t.category, description: t.description });
+    setForm({
+      date: toISODateString(t.date),
+      amount: String(t.amount),
+      category: t.category,
+      description: t.description,
+    });
     setFormError("");
     setModalOpen(true);
   }
@@ -195,22 +219,43 @@ export default function TransactionsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg font-bold text-indigo-600">FinanceAI</span>
+      <header
+        data-tour="app-header"
+        className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <Link href="/" className="shrink-0 text-lg font-bold text-indigo-600">
+            FinanceAI
+          </Link>
           <span className="hidden sm:block text-gray-300">|</span>
-          <span className="hidden sm:block text-sm text-gray-500">{email}</span>
+          <span className="hidden sm:inline truncate text-sm text-gray-500 max-w-[10rem] sm:max-w-none">
+            {email}
+          </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <Link
+            href="/"
+            className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition whitespace-nowrap hidden sm:inline"
+          >
+            Dashboard
+          </Link>
           <Link
             href="/categories"
-            className="hidden sm:block text-sm font-medium text-gray-500 hover:text-indigo-600 transition"
+            className="text-sm font-medium text-gray-500 hover:text-indigo-600 transition whitespace-nowrap"
           >
             Categories
           </Link>
           <button
+            type="button"
+            onClick={() => startTransactionsTour({ persistComplete: true })}
+            className="rounded-lg px-2.5 py-2 text-xs sm:text-sm font-medium text-purple-700 hover:bg-purple-50 transition whitespace-nowrap"
+            title="Replay tour for this page"
+          >
+            Tour
+          </button>
+          <button
             onClick={handleLogout}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition"
+            className="rounded-lg border border-gray-300 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition whitespace-nowrap"
           >
             Log out
           </button>
@@ -224,6 +269,7 @@ export default function TransactionsPage() {
             <div className="flex items-center gap-2 mb-1">
               <Link
                 href="/"
+                data-tour="nav-back-dashboard"
                 className="text-sm text-indigo-600 hover:text-indigo-500 font-medium"
               >
                 ← Dashboard
@@ -236,12 +282,16 @@ export default function TransactionsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              data-tour="txn-upload"
               onClick={() => setUploadModalOpen(true)}
               className="rounded-lg border border-indigo-300 bg-white px-4 py-2.5 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
             >
               ↑ Upload Statement
             </button>
             <button
+              type="button"
+              data-tour="txn-add"
               onClick={openModal}
               className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
             >
@@ -258,7 +308,10 @@ export default function TransactionsPage() {
         )}
 
         {/* Transactions table */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div
+          data-tour="txn-table"
+          className="bg-white rounded-2xl border border-gray-200 overflow-hidden"
+        >
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="font-semibold text-gray-900">All Transactions</h2>
             {!loading && (
@@ -516,6 +569,7 @@ export default function TransactionsPage() {
           </div>
         </div>
       )}
+      <TransactionsWalkthrough bootReady={!loading && userId !== null} />
     </div>
   );
 }

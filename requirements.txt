@@ -35,10 +35,10 @@ pillow==12.2.0
 protobuf==7.34.1
 py_rust_stemmers==0.1.5
 pycparser==2.23
+psycopg2-binary==2.9.10
 pydantic==2.12.5
 pydantic_core==2.41.5
 Pygments==2.20.0
-PyMySQL==1.1.0
 python-dotenv==1.0.0
 python-multipart==0.0.24
 PyYAML==6.0.3

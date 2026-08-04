@@ -233,6 +233,8 @@ export default function ChatWidget() {
     <>
       {/* Floating toggle button */}
       <button
+        type="button"
+        data-tour="chat-assistant"
         onClick={() => setOpen((o) => !o)}
         aria-label={open ? "Close chat" : "Open chat"}
         className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 rounded-full bg-purple-600 text-white shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-transform active:scale-95"

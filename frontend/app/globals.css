@@ -24,3 +24,24 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Match FinanceAI accents for driver.js tour popovers */
+.driver-popover-navigation-btns button {
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  font-weight: 600;
+  text-shadow: none;
+}
+.driver-popover-navigation-btns button:last-child {
+  background: rgb(147 51 234) !important;
+  border-color: rgb(126 34 206) !important;
+  color: #fff !important;
+}
+.driver-popover-navigation-btns button:last-child:hover,
+.driver-popover-navigation-btns button:last-child:focus {
+  background: rgb(126 34 206) !important;
+}
+.driver-popover-close-btn:hover,
+.driver-popover-close-btn:focus {
+  color: rgb(79 70 229) !important;
+}

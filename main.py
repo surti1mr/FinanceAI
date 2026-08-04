@@ -2,6 +2,7 @@
 
 import csv
 import io
+from datetime import datetime
 from typing import List
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
@@ -38,12 +39,23 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://finance-ai-murex.vercel.app",
-        "https://financeai-production-e021.up.railway.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def normalize_date(value: str) -> str:
+    date_str = value.strip()
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y"):
+        try:
+            return datetime.strptime(date_str, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Invalid date format: {value}. Use YYYY-MM-DD or DD-MM-YYYY.",
+    )
 
 
 @app.on_event("startup")
@@ -132,9 +144,16 @@ async def upload_transactions(
     db: Session = Depends(get_db),
 ):
     print(f"{request.method} {request.url.path}")
-    save_transactions(db, body.transactions)
-    add_transactions_to_index(body.transactions)
-    return {"success": True, "count": len(body.transactions)}
+    normalized_transactions = []
+    for item in body.transactions:
+        payload = item.model_dump()
+        payload["date"] = normalize_date(payload["date"])
+        payload["category"] = payload["category"].strip()
+        normalized_transactions.append(payload)
+
+    save_transactions(db, normalized_transactions)
+    add_transactions_to_index(normalized_transactions)
+    return {"success": True, "count": len(normalized_transactions)}
 
 
 @app.post("/upload-statement")
@@ -191,9 +210,9 @@ async def upload_statement(
 
         category = auto_categorize(row["description"], category_names)
         transactions.append({
-            "date": row["date"],
+            "date": normalize_date(row["date"]),
             "amount": abs(amount),
-            "category": category,
+            "category": category.strip(),
             "description": row["description"],
             "user_id": user_id,
         })
@@ -246,7 +265,10 @@ async def edit_transaction(
     db: Session = Depends(get_db),
 ):
     print(f"{request.method} {request.url.path}")
-    row = update_transaction(db, transaction_id, body.model_dump())
+    payload = body.model_dump()
+    payload["date"] = normalize_date(payload["date"])
+    payload["category"] = payload["category"].strip()
+    row = update_transaction(db, transaction_id, payload)
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
